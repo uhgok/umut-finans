@@ -509,20 +509,47 @@ setInterval(autoSync, 3000);
     document.getElementById("ufHistoryModal").style.display="flex";
   }
 
+    window.showHistoricalSnapshot=showHistoricalSnapshot;
+  function chartDataForCanvas(c){
+    if(c.__ufChartData && c.__ufChartData.labels && c.__ufChartData.labels.length) return c.__ufChartData;
+    var days=30;
+    var active=document.querySelector("#ufPeriods button.active");
+    if(active && active.dataset && active.dataset.d) days=Number(active.dataset.d)||30;
+    var dates=new Set();
+    Object.values(state.priceHistory||{}).forEach(function(rows){
+      (rows||[]).forEach(function(r){if(r && r.date)dates.add(r.date);});
+    });
+    var ds=Array.from(dates).sort().slice(-days);
+    var vals=ds.map(function(d){
+      var total=0,has=false;
+      (state.positions||[]).forEach(function(p){
+        var rows=(state.priceHistory&&state.priceHistory[p.ticker])||[];
+        var row=rows.find(function(r){return r.date===d});
+        if(row){total+=(Number(p.qty)||0)*(Number(row.close)||0);has=true;}
+      });
+      return has?total:null;
+    });
+    var labels=[],out=[];
+    ds.forEach(function(d,i){if(vals[i]!=null){labels.push(d);out.push(vals[i]);}});
+    var data={labels:labels,vals:out};
+    c.__ufChartData=data;
+    return data;
+  }
+
   function bindChartClick(c){
     if(!c || c.__ufHistoryClickBound) return;
     c.__ufHistoryClickBound=true;
     c.addEventListener("click",function(e){
-      var data=c.__ufChartData;
-      if(!data || !data.vals || !data.vals.length) return;
+      var data=chartDataForCanvas(c);
+      if(!data || !data.labels.length) return;
       var rect=c.getBoundingClientRect();
       var pad=32,usableW=rect.width-pad-14;
       var x=e.clientX-rect.left;
       var ratio=(x-pad)/usableW;
-      var idx=Math.round(ratio*(data.vals.length-1));
-      idx=Math.max(0,Math.min(data.vals.length-1,idx));
+      var idx=Math.round(ratio*(data.labels.length-1));
+      idx=Math.max(0,Math.min(data.labels.length-1,idx));
       var date=data.labels[idx];
-      if(date) showHistoricalSnapshot(date);
+      if(date && typeof window.showHistoricalSnapshot==="function") window.showHistoricalSnapshot(date);
     });
   }
 
