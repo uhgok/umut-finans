@@ -1,0 +1,215 @@
+{
+  "cash": 0,
+  "positions": [
+    {
+      "ticker": "AKBNK",
+      "qty": 166,
+      "avgCost": 90.15,
+      "price": 70.9,
+      "prev": 70.65,
+      "weekAgo": 71.55
+    },
+    {
+      "ticker": "ASELS",
+      "qty": 151,
+      "avgCost": 245.215,
+      "price": 372.25,
+      "prev": 367.75,
+      "weekAgo": 379.75
+    },
+    {
+      "ticker": "ASTOR",
+      "qty": 298,
+      "avgCost": 169.4245,
+      "price": 261.25,
+      "prev": 260.5,
+      "weekAgo": 255.5
+    },
+    {
+      "ticker": "AYEN",
+      "qty": 632,
+      "avgCost": 28.48,
+      "price": 27.64,
+      "prev": 27.14,
+      "weekAgo": 29.06
+    },
+    {
+      "ticker": "BIMAS",
+      "qty": 176,
+      "avgCost": 317.0739,
+      "price": 424.75,
+      "prev": 422.75,
+      "weekAgo": 418.0
+    },
+    {
+      "ticker": "BRSAN",
+      "qty": 15,
+      "avgCost": 666.5,
+      "price": 672.0,
+      "prev": 647.0,
+      "weekAgo": 666.0
+    },
+    {
+      "ticker": "EKGYO",
+      "qty": 1000,
+      "avgCost": 21.58,
+      "price": 19.22,
+      "prev": 19.58,
+      "weekAgo": 19.24
+    },
+    {
+      "ticker": "ENKAI",
+      "qty": 665,
+      "avgCost": 72.8623,
+      "price": 86.45,
+      "prev": 86.4,
+      "weekAgo": 85.75
+    },
+    {
+      "ticker": "GARAN",
+      "qty": 99,
+      "avgCost": 151.3,
+      "price": 129.8,
+      "prev": 128.8,
+      "weekAgo": 132.5
+    },
+    {
+      "ticker": "HEKTS",
+      "qty": 0.533,
+      "avgCost": 3.47,
+      "price": 2.18,
+      "prev": 2.16,
+      "weekAgo": 2.43
+    },
+    {
+      "ticker": "ISDMR",
+      "qty": 365,
+      "avgCost": 56.5129,
+      "price": 63.55,
+      "prev": 62.45,
+      "weekAgo": 62.1
+    },
+    {
+      "ticker": "ISMEN",
+      "qty": 174,
+      "avgCost": 44.972,
+      "price": 31.8,
+      "prev": 32.3,
+      "weekAgo": 34.72
+    },
+    {
+      "ticker": "KCAER",
+      "qty": 0.611,
+      "avgCost": 18.721,
+      "price": 11.2,
+      "prev": 11.01,
+      "weekAgo": 12.06
+    },
+    {
+      "ticker": "MPARK",
+      "qty": 67,
+      "avgCost": 407.9813,
+      "price": 426.0,
+      "prev": 426.5,
+      "weekAgo": 435.0
+    },
+    {
+      "ticker": "SAHOL",
+      "qty": 422,
+      "avgCost": 85.9633,
+      "price": 88.25,
+      "prev": 88.2,
+      "weekAgo": 90.6
+    },
+    {
+      "ticker": "SASA",
+      "qty": 0.8,
+      "avgCost": 5.2575,
+      "price": 2.08,
+      "prev": 2.11,
+      "weekAgo": 2.42
+    },
+    {
+      "ticker": "SISE",
+      "qty": 452,
+      "avgCost": 44.58,
+      "price": 39.24,
+      "prev": 39.14,
+      "weekAgo": 40.18
+    },
+    {
+      "ticker": "TAVHL",
+      "qty": 110,
+      "avgCost": 279.0682,
+      "price": 272.75,
+      "prev": 272.0,
+      "weekAgo": 271.98
+    },
+    {
+      "ticker": "TCELL",
+      "qty": 429,
+      "avgCost": 107.6103,
+      "price": 99.95,
+      "prev": 99.45,
+      "weekAgo": 99.15
+    },
+    {
+      "ticker": "TOASO",
+      "qty": 60,
+      "avgCost": 254.5,
+      "price": 290.0,
+      "prev": 279.5,
+      "weekAgo": 287.0
+    },
+    {
+      "ticker": "TUPRS",
+      "qty": 275,
+      "avgCost": 406.0,
+      "price": 406.0,
+      "prev": 410.75,
+      "weekAgo": 412.0
+    },
+    {
+      "ticker": "VAKFN",
+      "qty": 7692,
+      "avgCost": 1.04,
+      "price": 1.0,
+      "prev": 0.99,
+      "weekAgo": 1.03
+    }
+  ],
+  "history": [
+    [
+      "2026-09-17",
+      661817.57
+    ],
+    [
+      "2026-09-18",
+      656473.82
+    ],
+    [
+      "2026-09-21",
+      667614.58
+    ],
+    [
+      "2026-09-22",
+      661871.12
+    ],
+    [
+      "2026-09-23",
+      671181.19
+    ],
+    [
+      "2026-09-24",
+      657831.81
+    ],
+    [
+      "2026-09-25",
+      659577.23
+    ]
+  ],
+  "priceHistory": {},
+  "transactions": [],
+  "realizedPnL": 0,
+  "updatedAt": "2026-09-25"
+}
