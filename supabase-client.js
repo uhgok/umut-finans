@@ -336,3 +336,204 @@ setInterval(autoSync, 3000);
     }
   };
 })();
+
+
+// === Historical date snapshot on chart click ===
+(function(){
+  if(window.__ufHistoricalSnapshotInstalled) return;
+  window.__ufHistoricalSnapshotInstalled=true;
+
+  function ensureSnapshotUI(){
+    if(document.getElementById("ufHistoryModal")) return;
+    var st=document.createElement("style");
+    st.textContent=[
+      ".uf-history-modal{position:fixed;inset:0;z-index:11000;background:rgba(1,7,13,.82);display:none;align-items:center;justify-content:center;padding:18px}",
+      ".uf-history-box{width:min(1180px,96vw);max-height:92vh;overflow:auto;background:#0b1828;border:1px solid #2b4864;border-radius:20px;padding:20px;box-shadow:0 25px 90px rgba(0,0,0,.55)}",
+      ".uf-history-head{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:15px}",
+      ".uf-history-title{font-size:24px;font-weight:850}.uf-history-sub{font-size:11px;color:#8fa6bd;margin-top:4px}",
+      ".uf-history-close{border:1px solid #294865;background:#10233a;color:#fff;border-radius:9px;padding:7px 10px;cursor:pointer}",
+      ".uf-history-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:15px}",
+      ".uf-history-kpi{background:#0d2034;border:1px solid #213f5d;border-radius:12px;padding:12px}",
+      ".uf-history-kpi .l{font-size:10px;color:#8fa6bd}.uf-history-kpi .v{font-size:17px;font-weight:850;margin-top:5px}",
+      ".uf-history-table{border-collapse:collapse;width:100%;font-size:11px}.uf-history-table th,.uf-history-table td{padding:9px 10px;border-bottom:1px solid #193149;white-space:nowrap;text-align:right}",
+      ".uf-history-table th{background:#0c1b2c;color:#93abc2;position:sticky;top:0}.uf-history-table th:first-child,.uf-history-table td:first-child{text-align:left}",
+      ".uf-history-table tr:hover td{background:rgba(34,81,126,.14)}",
+      "@media(max-width:900px){.uf-history-kpis{grid-template-columns:repeat(2,1fr)}.uf-history-table{font-size:10px}.uf-history-table th,.uf-history-table td{padding:7px 8px}}"
+    ].join("");
+    document.head.appendChild(st);
+
+    var m=document.createElement("div");
+    m.id="ufHistoryModal";
+    m.className="uf-history-modal";
+    m.innerHTML='<div class="uf-history-box">'+
+      '<div class="uf-history-head"><div><div class="uf-history-title" id="ufHistoryTitle">Tarih</div><div class="uf-history-sub" id="ufHistorySub"></div></div><button class="uf-history-close" id="ufHistoryClose">Kapat</button></div>'+
+      '<div class="uf-history-kpis" id="ufHistoryKpis"></div>'+
+      '<div class="tablewrap"><table class="uf-history-table"><thead><tr>'+
+      '<th>Hisse</th><th>Adet</th><th>Fiyat</th><th>Değer</th><th>Maliyet</th><th>K/Z</th><th>Günlük K/Z</th><th>Günlük %</th><th>Ağırlık</th>'+
+      '</tr></thead><tbody id="ufHistoryBody"></tbody></table></div>'+
+      '</div>';
+    document.body.appendChild(m);
+    document.getElementById("ufHistoryClose").onclick=function(){m.style.display="none"};
+    m.onclick=function(e){if(e.target===m)m.style.display="none"};
+  }
+
+  function txsForTicker(ticker){
+    return (state.transactions||[]).filter(function(t){return t.ticker===ticker}).sort(function(a,b){return a.date.localeCompare(b.date)});
+  }
+
+  // Reconstructs quantity and average cost on a historical date using the
+  // same moving-average logic used when transactions are recorded.
+  function historicalPosition(p,date){
+    var txs=txsForTicker(p.ticker);
+    if(!txs.length) return {qty:Number(p.qty)||0,avgCost:Number(p.avgCost)||0};
+
+    var qty=Number(p.qty)||0;
+    var cost=qty*(Number(p.avgCost)||0);
+
+    for(var i=txs.length-1;i>=0;i--){
+      var t=txs[i], q=Number(t.qty)||0;
+      if(t.date<=date) break;
+
+      if(t.side==="ALIŞ"){
+        qty-=q;
+        cost-=q*(Number(t.price)||0)+(Number(t.fee)||0);
+      }else{
+        var avgAfter=qty>0?cost/qty:0;
+        if(qty<=0 && q>0){
+          avgAfter=(Number(t.price)||0)-((Number(t.realized)||0)+(Number(t.fee)||0))/q;
+        }
+        qty+=q;
+        cost=qty*avgAfter;
+      }
+    }
+    if(qty<0 && Math.abs(qty)<1e-9) qty=0;
+    return {qty:Math.max(0,qty),avgCost:qty>0?cost/qty:0};
+  }
+
+  function historicalCash(date){
+    var cash=Number(state.cash)||0;
+    var txs=(state.transactions||[]).slice().sort(function(a,b){return a.date.localeCompare(b.date)});
+    for(var i=txs.length-1;i>=0;i--){
+      var t=txs[i];
+      if(t.date<=date) break;
+      var q=Number(t.qty)||0,p=Number(t.price)||0,fee=Number(t.fee)||0;
+      var effect=t.side==="ALIŞ"?-(q*p+fee):(q*p-fee);
+      cash-=effect;
+    }
+    return cash;
+  }
+
+  function rowForDate(ticker,date){
+    var rows=(state.priceHistory&&state.priceHistory[ticker])||[];
+    if(!rows.length) return null;
+    var exact=rows.find(function(r){return r.date===date});
+    if(exact) return exact;
+    // For a non-trading date, use the latest available close before it.
+    var prior=rows.filter(function(r){return r.date<date}).at(-1);
+    return prior||null;
+  }
+
+  function previousRow(ticker,date){
+    var rows=(state.priceHistory&&state.priceHistory[ticker])||[];
+    var idx=-1;
+    for(var i=0;i<rows.length;i++){if(rows[i].date===date){idx=i;break}}
+    if(idx>0) return rows[idx-1];
+    if(idx===-1){
+      var prior=rows.filter(function(r){return r.date<date});
+      return prior.length?prior.at(-1):null;
+    }
+    return null;
+  }
+
+  function showHistoricalSnapshot(date){
+    ensureSnapshotUI();
+    var rows=[];
+    var totalValue=0,totalCost=0,totalDaily=0;
+    state.positions.forEach(function(p){
+      var hp=historicalPosition(p,date);
+      if(hp.qty<=0) return;
+      var pr=rowForDate(p.ticker,date);
+      if(!pr) return;
+      var price=Number(pr.close)||0;
+      var value=hp.qty*price;
+      var cost=hp.qty*hp.avgCost;
+      var prev=previousRow(p.ticker,pr.date);
+      var daily=prev?hp.qty*(price-Number(prev.close)):0;
+      var dp=prev&&Number(prev.close)?price/Number(prev.close)-1:0;
+      rows.push({ticker:p.ticker,qty:hp.qty,price:price,value:value,cost:cost,pnl:value-cost,daily:daily,dp:dp});
+      totalValue+=value;totalCost+=cost;totalDaily+=daily;
+    });
+
+    rows.sort(function(a,b){return b.value-a.value});
+    var cash=historicalCash(date);
+    var net=totalValue+cash;
+    var totalPnL=totalValue-totalCost;
+    var ret=totalCost?totalPnL/totalCost:0;
+    var biggestGain=rows.length?rows.slice().sort(function(a,b){return b.pnl-a.pnl})[0]:null;
+    var biggestLoss=rows.length?rows.slice().sort(function(a,b){return a.pnl-b.pnl})[0]:null;
+
+    document.getElementById("ufHistoryTitle").textContent=fmt(date);
+    document.getElementById("ufHistorySub").textContent=rows.length+" pozisyon • o güne ait kapanış fiyatları ve portföy dağılımı";
+
+    var k=[
+      ["PORTFÖY DEĞERİ",money(totalValue),"up"],
+      ["NAKİT",money(cash),cash>=0?"up":"down"],
+      ["TOPLAM VARLIK",money(net),net>=0?"up":""],
+      ["TOPLAM K/Z",money(totalPnL),totalPnL>=0?"up":"down"],
+      ["GÜNLÜK K/Z",money(totalDaily),totalDaily>=0?"up":"down"],
+      ["GETİRİ",pc(ret),ret>=0?"up":"down"],
+      ["POZİSYON",String(rows.length),""] ,
+      ["EN BÜYÜK KAZANÇ",biggestGain?biggestGain.ticker+" • "+money(biggestGain.pnl):"-","up"],
+      ["EN BÜYÜK ZARAR",biggestLoss?biggestLoss.ticker+" • "+money(biggestLoss.pnl):"-","down"],
+      ["AĞIRLIKLI K/Z",money(totalPnL),"up"]
+    ];
+    document.getElementById("ufHistoryKpis").innerHTML=k.map(function(x){
+      return '<div class="uf-history-kpi"><div class="l">'+x[0]+'</div><div class="v '+x[2]+'">'+x[1]+'</div></div>';
+    }).join("");
+
+    document.getElementById("ufHistoryBody").innerHTML=rows.map(function(x){
+      var w=totalValue?x.value/totalValue:0;
+      return '<tr>'+
+        '<td><b>'+x.ticker+'</b></td>'+
+        '<td>'+n(x.qty)+'</td>'+
+        '<td>'+n(x.price)+' TL</td>'+
+        '<td>'+money(x.value)+'</td>'+
+        '<td>'+money(x.cost)+'</td>'+
+        '<td class="'+(x.pnl>=0?"up":"down")+'">'+money(x.pnl)+'</td>'+
+        '<td class="'+(x.daily>=0?"up":"down")+'">'+signedMoney(x.daily)+'</td>'+
+        '<td class="'+(x.dp>=0?"up":"down")+'">'+pc(x.dp)+'</td>'+
+        '<td>'+pc(w)+'</td>'+
+      '</tr>';
+    }).join("") || '<tr><td colspan="9" class="muted">Bu tarih için fiyat geçmişinde veri bulunamadı.</td></tr>';
+
+    document.getElementById("ufHistoryModal").style.display="flex";
+  }
+
+  function bindChartClick(c){
+    if(!c || c.__ufHistoryClickBound) return;
+    c.__ufHistoryClickBound=true;
+    c.addEventListener("click",function(e){
+      var data=c.__ufChartData;
+      if(!data || !data.vals || !data.vals.length) return;
+      var rect=c.getBoundingClientRect();
+      var pad=32,usableW=rect.width-pad-14;
+      var x=e.clientX-rect.left;
+      var ratio=(x-pad)/usableW;
+      var idx=Math.round(ratio*(data.vals.length-1));
+      idx=Math.max(0,Math.min(data.vals.length-1,idx));
+      var date=data.labels[idx];
+      if(date) showHistoricalSnapshot(date);
+    });
+  }
+
+  var oldLine=window.lineChart;
+  window.lineChart=function(c,labels,vals){
+    oldLine(c,labels,vals);
+    bindChartClick(c);
+  };
+
+  ensureSnapshotUI();
+  setTimeout(function(){
+    document.querySelectorAll("canvas").forEach(bindChartClick);
+  },500);
+})();
