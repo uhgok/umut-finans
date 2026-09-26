@@ -238,6 +238,7 @@ setTimeout(refreshMarket,250);
   .uf-periods{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
   .uf-periods button{border:1px solid #294865;background:#0d2034;color:#b9c9db;padding:6px 9px;border-radius:9px;font-size:10px}
   .uf-periods button.active{background:#176bb0;border-color:#2a87cf;color:#fff}
+  .uf-chart-hint{margin-top:7px;color:#6f8ba5;font-size:10px;text-align:center}
   .uf-click{cursor:pointer;color:#8fc7ff}.uf-click:hover{text-decoration:underline}
   .uf-target{color:#f3c75f}
   .uf-modal{position:fixed;inset:0;background:rgba(1,7,13,.78);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
@@ -280,9 +281,32 @@ setTimeout(refreshMarket,250);
     if(fsection){
       var fh=fsection.querySelector("thead tr"); if(fh && !fh.querySelector("[data-f30g]")){var th2=document.createElement("th");th2.textContent="30G %";th2.dataset["f30g"]="1";fh.insertBefore(th2,fh.lastElementChild)}
     }
-    var chartCards=document.querySelectorAll("#dashboard .card");
-    if(chartCards.length && !document.getElementById("ufPeriods")){
-      var title=chartCards[0].querySelector(".section");if(title){var periods=document.createElement("div");periods.id="ufPeriods";periods.className="uf-periods";periods.innerHTML='<button data-d="7">7G</button><button data-d="10">10S</button><button data-d="30" class="active">30G</button><button data-d="90">3A</button><button data-d="365">1Y</button>';title.parentNode.insertBefore(periods,title.nextSibling);periods.querySelectorAll("button").forEach(function(x){x.onclick=function(){period=Number(x.dataset.d);periods.querySelectorAll("button").forEach(function(y){y.classList.remove("active")});x.classList.add("active");renderCharts()}})}
+    var valueCanvas=document.getElementById("valueChart");
+    var chartCard=valueCanvas ? valueCanvas.closest(".card") : null;
+    if(chartCard && !document.getElementById("ufPeriods")){
+      var title=chartCard.querySelector(".section");
+      if(title){
+        var periods=document.createElement("div");
+        periods.id="ufPeriods";
+        periods.className="uf-periods";
+        periods.innerHTML='<button data-d="7">7G</button><button data-d="10">10S</button><button data-d="30" class="active">30G</button><button data-d="90">3A</button><button data-d="365">1Y</button>';
+        title.parentNode.insertBefore(periods,title.nextSibling);
+        periods.querySelectorAll("button").forEach(function(x){
+          x.onclick=function(){
+            period=Number(x.dataset.d)||30;
+            periods.querySelectorAll("button").forEach(function(y){y.classList.remove("active")});
+            x.classList.add("active");
+            renderCharts();
+          };
+        });
+      }
+    }
+    if(chartCard && !document.getElementById("ufChartHint")){
+      var hint=document.createElement("div");
+      hint.id="ufChartHint";
+      hint.className="uf-chart-hint";
+      hint.textContent="Grafikte bir tarihe tıkla → o güne ait portföy detaylarını aç";
+      chartCard.querySelector(".body")?.appendChild(hint);
     }
     addModals();
   }
