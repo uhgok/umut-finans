@@ -229,4 +229,184 @@ setTimeout(refreshMarket,250);
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/supabase-client.js"></script>
+
+<style id="uf-enhancements">
+  .uf-kpis-7{grid-template-columns:repeat(7,minmax(120px,1fr))!important}
+  .uf-alert{display:none;margin-bottom:15px;padding:13px 15px;border-radius:14px;border:1px solid #81333f;background:linear-gradient(90deg,#33141d,#1a1118);color:#ffd8dc;font-size:12px;box-shadow:0 12px 35px rgba(0,0,0,.22)}
+  .uf-alert.show{display:block}.uf-alert b{color:#fff}
+  .uf-toolbar-btn{margin-left:4px}
+  .uf-periods{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .uf-periods button{border:1px solid #294865;background:#0d2034;color:#b9c9db;padding:6px 9px;border-radius:9px;font-size:10px}
+  .uf-periods button.active{background:#176bb0;border-color:#2a87cf;color:#fff}
+  .uf-click{cursor:pointer;color:#8fc7ff}.uf-click:hover{text-decoration:underline}
+  .uf-target{color:#f3c75f}
+  .uf-modal{position:fixed;inset:0;background:rgba(1,7,13,.78);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+  .uf-modalbox{width:min(820px,100%);max-height:90vh;overflow:auto;background:#0b1828;border:1px solid #2b4864;border-radius:20px;padding:20px;box-shadow:0 25px 90px rgba(0,0,0,.5)}
+  .uf-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.uf-form .full{grid-column:1/-1}
+  .uf-form label{display:block;color:#96acc3;font-size:11px;margin-bottom:5px}.uf-form input,.uf-form select{width:100%;padding:10px;border-radius:10px;border:1px solid #294763;background:#081524;color:#fff}
+  .uf-close{float:right;border:1px solid #294865;background:#10233a;color:#fff;border-radius:9px;padding:6px 9px}
+  .uf-stockgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}.uf-mini{background:#0d2034;border:1px solid #213f5d;border-radius:12px;padding:12px}.uf-mini .l{font-size:10px;color:#8fa6bd}.uf-mini .v{font-size:18px;font-weight:800;margin-top:5px}
+  .uf-watch-add{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.uf-watch-add input{background:#091625;border:1px solid #264561;color:#fff;border-radius:10px;padding:9px}.uf-watch-add input.wide{min-width:220px;flex:1}
+  @media(max-width:1200px){.uf-kpis-7{grid-template-columns:repeat(4,minmax(120px,1fr))!important}.uf-stockgrid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:700px){.uf-kpis-7{grid-template-columns:repeat(2,minmax(120px,1fr))!important}.uf-form{grid-template-columns:1fr}.uf-form .full{grid-column:auto}}
+</style>
+<script>
+(function(){
+  var period=30;
+  function ensureUI(){
+    var main=document.querySelector(".main");
+    if(!main) return;
+    if(!document.getElementById("ufAlert")){
+      var a=document.createElement("div");a.id="ufAlert";a.className="uf-alert";main.insertBefore(a,main.firstElementChild?.nextElementSibling||main.firstElementChild);
+    }
+    var pnav=document.querySelector('.nav button[data-p="portfolio"]');
+    if(pnav && !document.querySelector('.nav button[data-p="watchlist"]')){
+      var b=document.createElement("button");b.dataset.p="watchlist";b.textContent="⭐ Takip";pnav.parentNode.insertBefore(b,pnav.nextSibling);
+      b.onclick=function(){document.querySelectorAll(".nav button").forEach(function(x){x.classList.remove("active")});b.classList.add("active");document.querySelectorAll(".panel").forEach(function(x){x.classList.remove("active")});document.getElementById("watchlist").classList.add("active")};
+    }
+    if(!document.getElementById("watchlist")){
+      var sec=document.createElement("section");sec.id="watchlist";sec.className="panel";
+      sec.innerHTML='<div class="card"><div class="section">Takip Listesi</div><div class="body"><div class="uf-watch-add"><input id="ufWatchTicker" placeholder="Hisse • örn. THYAO"><input id="ufWatchTarget" type="number" step="0.01" placeholder="Hedef fiyat"><input id="ufWatchNote" class="wide" placeholder="Not"><button class="btn primary" id="ufAddWatch">+ Takibe Ekle</button></div><div class="tablewrap"><table class="table"><thead><tr><th>Hisse</th><th>Güncel</th><th>Günlük %</th><th>Hedef</th><th>Hedefe Uzaklık</th><th>Not</th><th></th></tr></thead><tbody id="ufWatchBody"></tbody></table></div></div></div>';
+      main.appendChild(sec);
+      document.getElementById("ufAddWatch").onclick=addWatch;
+    }
+    var psection=document.getElementById("portfolio");
+    if(psection){
+      var bar=psection.querySelector(".toolbar");
+      if(bar && !document.getElementById("ufAddPosition")){var ab=document.createElement("button");ab.id="ufAddPosition";ab.className="btn primary uf-toolbar-btn";ab.textContent="+ Yeni Pozisyon";ab.onclick=openAddPosition;bar.appendChild(ab)}
+      var h=psection.querySelector("thead tr"); if(h && !h.querySelector("[data-30g]")){var th=document.createElement("th");th.textContent="30G %";th.dataset["30g"]="1";h.insertBefore(th,h.lastElementChild)}
+    }
+    var fsection=document.getElementById("performance");
+    if(fsection){
+      var fh=fsection.querySelector("thead tr"); if(fh && !fh.querySelector("[data-f30g]")){var th2=document.createElement("th");th2.textContent="30G %";th2.dataset["f30g"]="1";fh.insertBefore(th2,fh.lastElementChild)}
+    }
+    var chartCards=document.querySelectorAll("#dashboard .card");
+    if(chartCards.length && !document.getElementById("ufPeriods")){
+      var title=chartCards[0].querySelector(".section");if(title){var periods=document.createElement("div");periods.id="ufPeriods";periods.className="uf-periods";periods.innerHTML='<button data-d="7">7G</button><button data-d="10">10S</button><button data-d="30" class="active">30G</button><button data-d="90">3A</button><button data-d="365">1Y</button>';title.parentNode.insertBefore(periods,title.nextSibling);periods.querySelectorAll("button").forEach(function(x){x.onclick=function(){period=Number(x.dataset.d);periods.querySelectorAll("button").forEach(function(y){y.classList.remove("active")});x.classList.add("active");renderCharts()}})}
+    }
+    addModals();
+  }
+  function addModals(){
+    if(!document.getElementById("ufDetail")){
+      var m=document.createElement("div");m.id="ufDetail";m.className="uf-modal";m.style.display="none";m.innerHTML='<div class="uf-modalbox"><button class="uf-close" id="ufCloseDetail">Kapat</button><div style="font-size:10px;letter-spacing:.15em;color:#75b7ff;font-weight:800">HİSSE DETAYI</div><div id="ufDetailTitle" style="font-size:26px;font-weight:850;margin-top:5px"></div><div class="uf-stockgrid" id="ufDetailGrid"></div><canvas id="ufDetailChart" style="height:260px;width:100%"></canvas><div id="ufDetailExtra" style="margin-top:10px"></div></div></div>';document.body.appendChild(m);document.getElementById("ufCloseDetail").onclick=function(){m.style.display="none"};m.onclick=function(e){if(e.target===m)m.style.display="none"}
+    }
+    if(!document.getElementById("ufAddModal")){
+      var am=document.createElement("div");am.id="ufAddModal";am.className="uf-modal";am.style.display="none";am.innerHTML='<div class="uf-modalbox"><button class="uf-close" id="ufCloseAdd">Kapat</button><div style="font-size:10px;letter-spacing:.15em;color:#75b7ff;font-weight:800">POZİSYON EKLE</div><div style="font-size:24px;font-weight:850;margin:5px 0 16px">Yeni Hisse</div><div class="uf-form"><div><label>Hisse</label><input id="ufAddTicker" placeholder="THYAO"></div><div><label>Adet</label><input id="ufAddQty" type="number" step="0.001"></div><div><label>Ortalama maliyet</label><input id="ufAddCost" type="number" step="0.01"></div><div><label>Not</label><input id="ufAddNote"></div><div class="full" style="display:flex;justify-content:flex-end;gap:8px;margin-top:3px"><button class="btn" id="ufCloseAdd2">Vazgeç</button><button class="btn good" id="ufSaveAdd">Pozisyonu Kaydet</button></div></div></div></div>';document.body.appendChild(am);
+      document.getElementById("ufCloseAdd").onclick=closeAddPosition;document.getElementById("ufCloseAdd2").onclick=closeAddPosition;document.getElementById("ufSaveAdd").onclick=saveNewPosition;
+    }
+  }
+  function sessionOld(p,nSessions){var rows=state.priceHistory&&state.priceHistory[p.ticker];if(rows&&rows.length>nSessions)return Number(rows[Math.max(0,rows.length-nSessions)].close);if(nSessions===7)return Number(p.weekAgo);return null}
+  function changeN(p,nSessions){var old=sessionOld(p,nSessions);return old?Number(p.price)/old-1:null}
+  function change30(p){return changeN(p,30)}
+  function currentPortfolioPrevious(){return state.positions.reduce(function(s,p){return s+p.qty*p.prev},0)}
+  function portfolioDailyReturn(){var base=currentPortfolioPrevious();return base?dailyPnL()/base:0}
+  function renderAlert(){
+    ensureUI();var box=document.getElementById("ufAlert");var messages=[];var pr=portfolioDailyReturn();
+    if(pr<=-0.05)messages.push("<b>⚠ Portföy uyarısı:</b> bugünkü değişim "+pc(pr)+" ile -5% eşiğinin altında.");
+    var stocks=state.positions.filter(function(p){return dayPct(p)<=-0.05}).slice(0,6);
+    if(stocks.length)messages.push("<b>Hisse uyarıları:</b> "+stocks.map(function(p){return p.ticker+" "+pc(dayPct(p))}).join(" • "));
+    if(messages.length){box.innerHTML=messages.join("<br>");box.classList.add("show")}else{box.classList.remove("show");box.innerHTML=""}
+  }
+  window.renderKPIs=function(){
+    var invested=totalCost();
+    var a=[["PORTFÖY DEĞERİ",money(totalValue()),"", ""],["BUGÜN K/Z",money(dailyPnL()),pc(totalValue()?dailyPnL()/totalValue():0),dailyPnL()>=0?"up":"down"],["TOPLAM K/Z",money(totalPnL()),pc(totalReturn()),totalPnL()>=0?"up":"down"],["SON 7G K/Z",money(weekPnL()),pc(weekReturn()),weekPnL()>=0?"up":"down"],["SON 7G GETİRİ",pc(weekReturn()),"son 5 işlem günü",weekReturn()>=0?"up":"down"],["SON 10 SEANS K/Z",money(state.positions.reduce(function(s,p){var o=sessionOld(p,10);return s+(o==null?0:p.qty*(p.price-o))},0)),"", ""] ,["TOPLAM YATIRIM",money(invested),"maliyet tabanı",""]];
+    document.getElementById("kpis").classList.add("uf-kpis-7");document.getElementById("kpis").innerHTML=a.map(function(x){return '<div class="card kpi"><div class="lab">'+x[0]+'</div><div class="val '+x[3]+'">'+x[1]+'</div><div class="subv '+x[3]+'">'+x[2]+'</div></div>'}).join("");
+  }
+  window.renderPortfolio=function(){
+    var q=(document.getElementById("psearch")?.value||"").toUpperCase();
+    document.getElementById("pbody").innerHTML=state.positions.filter(function(p){return p.ticker.includes(q)}).map(function(p){
+      var v=p.qty*p.price,pnl=v-p.qty*p.avgCost,w7=weekPct(p),c7=contrib(p),w30=change30(p);
+      return '<tr><td><b class="uf-click" data-ticker="'+p.ticker+'">'+p.ticker+'</b></td><td>'+n(p.qty)+'</td><td>'+n(p.avgCost)+'</td><td><b>'+n(p.price)+'</b></td><td class="'+(dayPct(p)>=0?"up":"down")+'">'+pc(dayPct(p))+'</td><td>'+money(v)+'</td><td class="'+(pnl>=0?"up":"down")+'">'+money(pnl)+'</td><td class="'+(w7>=0?"up":"down")+'">'+pc(w7)+'</td><td class="'+(w30==null?"muted":(w30>=0?"up":"down"))+'">'+(w30==null?"-":pc(w30))+'</td><td class="'+(c7>=0?"up":"down")+'">'+money(c7)+'</td><td>'+pc(wgt(p))+'</td></tr>';
+    }).join("");
+    document.getElementById("pcnt").textContent=state.positions.length+" pozisyon";
+    document.querySelectorAll("#pbody [data-ticker]").forEach(function(el){el.onclick=function(){openDetail(el.dataset.ticker)}});
+  }
+  window.renderPerf=function(){
+    var q=(document.getElementById("fsearch")?.value||"").toUpperCase();
+    document.getElementById("fbody").innerHTML=state.positions.filter(function(p){return p.ticker.includes(q)}).map(function(p){
+      var w7=weekPct(p),w30=change30(p);return '<tr><td><b class="uf-click" data-ticker="'+p.ticker+'">'+p.ticker+'</b></td><td>'+n(p.weekAgo)+'</td><td>'+n(p.price)+'</td><td class="'+(w7>=0?"up":"down")+'">'+pc(w7)+'</td><td class="'+(w30==null?"muted":(w30>=0?"up":"down"))+'">'+(w30==null?"-":pc(w30))+'</td><td class="'+(contrib(p)>=0?"up":"down")+'">'+money(contrib(p))+'</td></tr>'
+    }).join("");
+    document.querySelectorAll("#fbody [data-ticker]").forEach(function(el){el.onclick=function(){openDetail(el.dataset.ticker)}});
+  }
+  window.renderRanks= function(){
+    var s=state.positions.map(function(p){return {t:p.ticker,v:changeN(p,7)==null?0:contrib(p)}}).sort(function(a,b){return b.v-a.v});
+    document.getElementById("winners").innerHTML=s.slice(0,5).map(function(x){return '<div class="rank"><b>'+x.t+'</b><span class="up">+'+money(x.v)+'</span></div>'}).join("");
+    document.getElementById("losers").innerHTML=s.slice(-5).reverse().map(function(x){return '<div class="rank"><b>'+x.t+'</b><span class="down">'+money(x.v)+'</span></div>'}).join("");
+    var losses=state.positions.filter(function(p){return p.qty*p.price-p.qty*p.avgCost<0}).reduce(function(s,p){return s+(p.qty*p.price-p.qty*p.avgCost)},0);
+    var maxLoss=state.positions.map(function(p){return {t:p.ticker,v:p.qty*(p.price-p.avgCost)}}).sort(function(a,b){return a.v-b.v})[0],maxGain=state.positions.map(function(p){return {t:p.ticker,v:p.qty*(p.price-p.avgCost)}}).sort(function(a,b){return b.v-a.v})[0];
+    var ten=state.positions.reduce(function(s,p){var o=sessionOld(p,10);return s+(o==null?0:p.qty*(p.price-o))},0);
+    document.getElementById("quick").innerHTML=[
+      ["En büyük kazanç",maxGain.t+" • "+money(maxGain.v),"up"],["En büyük zarar",maxLoss.t+" • "+money(maxLoss.v),"down"],
+      ["Zarar yoğunluğu",losses?((Math.abs(maxLoss.v)/Math.abs(losses))*100).toFixed(1)+"%":"0,0%",""],["NAKİT",money(state.cash),"up"],
+      ["10 seans K/Z",money(ten),ten>=0?"up":"down"],["Gerçekleşmiş K/Z",money(state.realizedPnL||0),(state.realizedPnL||0)>=0?"up":"down"]
+    ].map(function(x){return '<div class="statusrow"><span>'+x[0]+'</span><b class="'+x[2]+'">'+x[1]+'</b></div>'}).join("");
+  }
+  window.renderWatchlist=function(){
+    var body=document.getElementById("ufWatchBody");if(!body)return;
+    body.innerHTML=(state.watchlist||[]).map(function(w,i){
+      var price=Number(w.price||0), prev=Number(w.prev||0),d=prev?price/prev-1:0,target=w.target?Number(w.target):null,dist=(target&&price)?target/price-1:null;
+      return '<tr><td><b class="uf-click" data-wticker="'+w.ticker+'">'+w.ticker+'</b></td><td>'+ (price?num(price):"-")+'</td><td class="'+(d>=0?"up":"down")+'">'+(price?pc(d):"-")+'</td><td class="uf-target">'+(target?num(target):"-")+'</td><td class="'+(dist==null?"muted":(dist>=0?"up":"down"))+'">'+(dist==null?"-":pc(dist))+'</td><td>'+ (w.note||"")+'</td><td><button class="btn" data-wremove="'+i+'">Sil</button></td></tr>';
+    }).join("")||'<tr><td colspan="7" class="muted">Takip listesi boş.</td></tr>';
+    body.querySelectorAll("[data-wremove]").forEach(function(b){b.onclick=function(){var i=Number(b.dataset.wremove);removeWatch(i)}});
+    body.querySelectorAll("[data-wticker]").forEach(function(b){b.onclick=function(){openDetail(b.dataset.wticker)}});
+  }
+  function openDetail(ticker){
+    ensureUI();var p=state.positions.find(function(x){return x.ticker===ticker}),w=(state.watchlist||[]).find(function(x){return x.ticker===ticker});if(!p&&w)p={ticker:ticker,qty:0,avgCost:0,price:w.price||0,prev:w.prev||0,weekAgo:0};if(!p)return;
+    var v=p.qty*p.price,pnl=v-p.qty*p.avgCost,w7=weekPct(p),w10=changeN(p,10),w30=change30(p);
+    document.getElementById("ufDetailTitle").textContent=p.ticker;
+    document.getElementById("ufDetailGrid").innerHTML=[
+      ["Güncel",p.qty?money(v):money(p.price)],["Ort. Maliyet",p.qty?num(p.avgCost)+" TL":"-"],["Toplam K/Z",p.qty?money(pnl):"-"],["Bugün",p.prev?pc(dayPct(p)):"-"],
+      ["7G",p.qty?pc(w7):"-"],["10 Seans",w10==null?"-":pc(w10)],["30G",w30==null?"-":pc(w30)],["Ağırlık",p.qty?pc(weight(p)):"-"]
+    ].map(function(x){return '<div class="uf-mini"><div class="l">'+x[0]+'</div><div class="v">'+x[1]+'</div></div>'}).join("");
+    var rows=state.priceHistory?.[ticker]||[];lineChart(document.getElementById("ufDetailChart"),rows.slice(-60).map(function(r){return r.date}),rows.slice(-60).map(function(r){return r.close}));
+    document.getElementById("ufDetailExtra").innerHTML='<div class="notice">Son fiyat sağlayıcısı: '+(state.priceProvider||"Yahoo Finance Chart")+' • Tarihçe: '+rows.length+' seans</div>';
+    document.getElementById("ufDetail").style.display="flex";
+  }
+  function openAddPosition(){ensureUI();document.getElementById("ufAddTicker").value="";document.getElementById("ufAddQty").value="";document.getElementById("ufAddCost").value="";document.getElementById("ufAddNote").value="";document.getElementById("ufAddModal").style.display="flex"}
+  function closeAddPosition(){document.getElementById("ufAddModal").style.display="none"}
+  async function saveNewPosition(){
+    var t=document.getElementById("ufAddTicker").value.trim().toUpperCase(),q=Number(document.getElementById("ufAddQty").value),c=Number(document.getElementById("ufAddCost").value),note=document.getElementById("ufAddNote").value.trim();
+    if(!/^[A-Z0-9.]+$/.test(t)||!q||!c)return alert("Hisse, adet ve maliyet gerekli.");
+    if(state.positions.some(function(p){return p.ticker===t}))return alert("Bu hisse zaten portföyde.");
+    state.positions.push({ticker:t,qty:q,avgCost:c,price:c,prev:c,weekAgo:c});
+    state.priceHistory[t]=[];closeAddPosition();save();
+    try{if(typeof sb!=="undefined"){await sb.from("market_symbols").upsert({ticker:t,yahoo_ticker:t+".IS",enabled:true},{onConflict:"ticker"});var s=await getSession();if(s)await syncPositions(s.user.id)}}catch(e){console.warn(e)}
+    if(note)state.transactions.push({date:iso(),ticker:t,side:"ALIŞ",qty:q,price:c,fee:0,realized:0,note:"Başlangıç pozisyonu: "+note});
+    save();setTimeout(refreshMarket,100);
+  }
+  async function loadWatchlistDB(){
+    try{if(typeof sb==="undefined")return;var s=await getSession();if(!s)return;var r=await sb.from("watchlist").select("ticker,target_price,note").eq("user_id",s.user.id);if(r.data){state.watchlist=r.data.map(function(x){return {ticker:x.ticker,target:x.target_price,note:x.note||"",price:0,prev:0}});renderWatchlist();}}catch(e){console.warn(e)}
+  }
+  async function syncWatchlistDB(){
+    try{if(typeof sb==="undefined")return;var s=await getSession();if(!s)return;await sb.from("watchlist").delete().eq("user_id",s.user.id);if((state.watchlist||[]).length)await sb.from("watchlist").insert(state.watchlist.map(function(w){return {user_id:s.user.id,ticker:w.ticker,target_price:w.target||null,note:w.note||null}}))}catch(e){console.warn(e)}
+  }
+  async function addWatch(){
+    var t=document.getElementById("ufWatchTicker").value.trim().toUpperCase(),target=Number(document.getElementById("ufWatchTarget").value)||null,note=document.getElementById("ufWatchNote").value.trim();if(!t)return alert("Hisse kodu gerekli.");
+    state.watchlist=state.watchlist||[];if(state.watchlist.some(function(x){return x.ticker===t}))return alert("Bu hisse zaten takipte.");
+    state.watchlist.push({ticker:t,target:target,note:note,price:0,prev:0});save();try{if(typeof sb!=="undefined"){await sb.from("market_symbols").upsert({ticker:t,yahoo_ticker:t+".IS",enabled:true},{onConflict:"ticker"});await syncWatchlistDB()}}catch(e){console.warn(e)};document.getElementById("ufWatchTicker").value="";document.getElementById("ufWatchTarget").value="";document.getElementById("ufWatchNote").value="";setTimeout(refreshMarket,100)
+  }
+  async function removeWatch(i){var w=(state.watchlist||[])[i];state.watchlist.splice(i,1);save();await syncWatchlistDB();if(w)refreshMarket()}
+  window.renderCharts=function(){
+    var hs=buildPortfolioSeries(period);lineChart(document.getElementById("valueChart"),hs.map(function(x){return x[0]}),hs.map(function(x){return x[1]}));lineChart(document.getElementById("perfChart"),hs.map(function(x){return x[0]}),hs.map(function(x){return x[1]}));donut(document.getElementById("donut"),state.positions.map(function(p){return {t:p.ticker,v:p.qty*p.price}}).sort(function(a,b){return b.v-a.v}))
+  }
+  function buildPortfolioSeries(days){
+    var dates=new Set();Object.values(state.priceHistory||{}).forEach(function(rows){rows.forEach(function(r){dates.add(r.date)})});
+    var ds=[...dates].sort().slice(-days);return ds.map(function(d){var v=0,has=false;state.positions.forEach(function(p){var row=(state.priceHistory?.[p.ticker]||[]).find(function(r){return r.date===d});if(row){v+=p.qty*row.close;has=true}});return has?[d,v]:null}).filter(Boolean)
+  }
+  window.refreshMarket=async function(){
+    renderFeed({ok:false,text:"Güncelleniyor…"});var tickers=state.positions.map(function(p){return p.ticker}).concat((state.watchlist||[]).map(function(w){return w.ticker})).filter(function(v,i,a){return a.indexOf(v)===i});
+    var symbols=tickers.map(function(t){return encodeURIComponent(t+".IS")}).join(",");
+    try{
+      var r=await fetch("/api/history?symbols="+symbols);if(!r.ok)throw Error(r.status);var j=await r.json(),count=0;
+      state.watchlist=state.watchlist||[];
+      tickers.forEach(function(t){var rows=j.data?.[t+".IS"]?.rows||[];if(!rows.length)return;var p=state.positions.find(function(x){return x.ticker===t}),w=state.watchlist.find(function(x){return x.ticker===t});var last=rows.at(-1),prev=rows.at(-2),wk=rows[Math.max(0,rows.length-7)];if(p){p.price=last.close;p.prev=prev?.close??p.prev;p.weekAgo=wk?.close??p.weekAgo}if(w){w.price=last.close;w.prev=prev?.close??w.prev}state.priceHistory[t]=rows;count++});
+      if(count){state.updatedAt=j.updatedAt.slice(0,10);state.priceProvider="Yahoo Finance Chart";state.history=buildPortfolioSeries(period);save();renderFeed({ok:true,text:count+" hisse verisi güncellendi"});await syncWatchlistDB();}else renderFeed({ok:false,text:"Veri dönmedi"});
+    }catch(e){renderFeed({ok:false,text:"Otomatik veri alınamadı • kayıtlı veriler gösteriliyor"});}
+  }
+  window.renderAll=function(){ensureUI();renderKPIs();renderPortfolio();renderPerf();renderRanks();renderWatchlist();renderCharts();renderFeed();renderAlert();if(document.getElementById("cash"))document.getElementById("cash").value=state.cash;document.getElementById("subline").textContent="Son veri: "+(state.updatedAt?fmt(state.updatedAt):"-")+" • "+state.positions.length+" pozisyon";};
+  var oldSave=window.save; window.save=function(){localStorage.setItem(KEY,JSON.stringify(state));renderAll()};
+  setTimeout(function(){ensureUI();loadWatchlistDB();renderAll();},400);
+  document.addEventListener("DOMContentLoaded",function(){ensureUI();loadWatchlistDB();renderAll()});
+})();
+</script>
 </body></html>
