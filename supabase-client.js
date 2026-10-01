@@ -581,6 +581,34 @@ setInterval(autoSync, 3000);
     bindChartClick(c);
   };
 
+  // Extra robust click handling: use one document-level listener so clicks keep
+  // working even when the chart is re-rendered or its event handlers are replaced.
+  if(!window.__ufHistoryDocumentClickBound){
+    window.__ufHistoryDocumentClickBound=true;
+    document.addEventListener("click",function(e){
+      var canvas=e.target && e.target.closest ? e.target.closest("#valueChart,#perfChart") : null;
+      if(!canvas || !document.body.contains(canvas)) return;
+
+      var data=chartDataForCanvas(canvas);
+      if(!data || !data.labels || !data.labels.length) return;
+
+      var rect=canvas.getBoundingClientRect();
+      if(!rect.width) return;
+
+      var pad=32, usableW=Math.max(1,rect.width-pad-14);
+      var x=e.clientX-rect.left;
+      var ratio=(x-pad)/usableW;
+      ratio=Math.max(0,Math.min(1,ratio));
+      var idx=Math.round(ratio*(data.labels.length-1));
+      idx=Math.max(0,Math.min(data.labels.length-1,idx));
+      var date=data.labels[idx];
+
+      if(date && typeof window.showHistoricalSnapshot==="function"){
+        window.showHistoricalSnapshot(date);
+      }
+    },true);
+  }
+
   ensureSnapshotUI();
   setTimeout(function(){
     document.querySelectorAll("canvas").forEach(bindChartClick);
