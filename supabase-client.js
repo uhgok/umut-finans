@@ -175,13 +175,17 @@ setInterval(autoSync, 3000);
   var style = document.createElement("style");
   style.id = "uf-chart-tooltip-style";
   style.textContent = [
-    ".uf-chart-tooltip{position:fixed;display:none;z-index:10000;pointer-events:none;min-width:170px;max-width:240px;padding:10px 12px;border:1px solid #315372;border-radius:11px;background:rgba(7,17,28,.97);box-shadow:0 12px 35px rgba(0,0,0,.38);color:#edf4fc;font:12px/1.5 Segoe UI,Arial,sans-serif}",
+    ".uf-chart-tooltip{position:fixed;display:none;z-index:10000;pointer-events:none;min-width:190px;max-width:280px;max-height:390px;overflow:auto;padding:10px 12px;border:1px solid #315372;border-radius:11px;background:rgba(7,17,28,.97);box-shadow:0 12px 35px rgba(0,0,0,.38);color:#edf4fc;font:12px/1.5 Segoe UI,Arial,sans-serif}",
     ".uf-chart-tooltip .tt-date{color:#8fa6bd;font-size:10px;margin-bottom:5px}",
     ".uf-chart-tooltip .tt-row{display:flex;justify-content:space-between;gap:16px}",
     ".uf-chart-tooltip .tt-label{color:#8fa6bd}",
     ".uf-chart-tooltip .tt-value{font-weight:800;color:#fff}",
     ".uf-chart-tooltip .tt-up{color:#2ad77e}",
     ".uf-chart-tooltip .tt-down{color:#ff7180}",
+    ".uf-chart-tooltip .tt-stock-list{margin-top:7px;padding-top:7px;border-top:1px solid #213b55}",
+    ".uf-chart-tooltip .tt-stock{display:flex;justify-content:space-between;gap:18px;padding:2px 0;font-size:10px}",
+    ".uf-chart-tooltip .tt-stock .s-name{color:#9bb0c4}",
+    ".uf-chart-tooltip .tt-stock .s-price{color:#edf4fc;font-weight:700}"
     "canvas.uf-hover-chart{cursor:crosshair}"
   ].join("");
   document.head.appendChild(style);
@@ -312,9 +316,27 @@ setInterval(autoSync, 3000);
         var deltaLabel=isDetail?"Günlük değişim":"Günlük K/Z";
 
         var tip=tooltip();
-        tip.innerHTML='<div class="tt-date">'+formatDate(data.labels[idx])+'</div>'+
+        var html='<div class="tt-date">'+formatDate(data.labels[idx])+'</div>'+
           '<div class="tt-row"><span class="tt-label">'+title+'</span><span class="tt-value">'+money(cur)+'</span></div>'+
           (delta==null?"":'<div class="tt-row"><span class="tt-label">'+deltaLabel+'</span><span class="tt-value '+(delta>=0?"tt-up":"tt-down")+'">'+signedMoney(delta)+'</span></div>');
+
+        if(!isDetail){
+          var d=data.labels[idx];
+          var stocks=[];
+          (state.positions||[]).forEach(function(p){
+            var rows=(state.priceHistory&&state.priceHistory[p.ticker])||[];
+            var row=rows.find(function(r){return r.date===d});
+            if(row) stocks.push([p.ticker,Number(row.close)||0]);
+          });
+          if(stocks.length){
+            html+='<div class="tt-stock-list">'+
+              stocks.map(function(x){
+                return '<div class="tt-stock"><span class="s-name">'+x[0]+'</span><span class="s-price">'+n(x[1])+' TL</span></div>';
+              }).join('')+
+              '</div>';
+          }
+        }
+        tip.innerHTML=html;
 
         tip.style.display="block";
 
